@@ -20,7 +20,8 @@ matplotlib==3.5.3
     # via problexity
 mmh3==3.0.0
     # via -r requirements.in
-numpy==1.19.2
+#numpy==1.19.2
+numpy==1.20
     # via
     #   -r requirements.in
     #   matplotlib
