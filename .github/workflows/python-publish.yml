@@ -1,0 +1,31 @@
+name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+
+on:
+  push:
+    tags:
+    - v*
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+    - name: Install pypa/build
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    - name: Perform tests
+      run: python3 -m unittest discover tests
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
