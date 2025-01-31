@@ -1,6 +1,7 @@
 [build-system]
 requires = ["setuptools >= 61.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+backend-path = [".", "./lib/python3.9/site-packages/setuptools/__init__.py"]
 
 [project]
 name = "learnedbf"
