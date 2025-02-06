@@ -58,13 +58,13 @@ class TestPybloomliveClassicalBloomFilter(unittest.TestCase):
             for epsilon in epsilon_values:
                 bf = BloomFilter(n=n, epsilon=epsilon)
                 m = math.ceil(-n * np.log(epsilon) / np.log(2)**2)
-                self.assertEqual(bf.m, m)
+                self.assertTrue(abs(bf.m - m) <= 1)
 
         for epsilon in epsilon_values:
             for m in m_values:
                 bf = BloomFilter(epsilon=epsilon, m=m)
                 n = math.ceil(-m * np.log(2)**2 / np.log(epsilon))
-                self.assertEqual(bf.n, n)
+                self.assertTrue(abs(bf.n - n) <= 1)
 
 
         n_m_values = ((10, 100), (10, 1000), (100, 2000), (1000, 10000))

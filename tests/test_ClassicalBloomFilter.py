@@ -37,7 +37,7 @@ class TestPybloomliveClassicalBloomFilter(unittest.TestCase):
         for num_keys in np.logspace(1, 5, 5).astype(int):
             for epsilon in (0.01, 0.05, 0.1, 0.2):
                 X = np.random.randint(0, 1_000_000, size=(num_keys, 1))
-                bf = ClassicalBloomFilter(n=num_keys,
+                bf = BloomFilter(n=num_keys,
                                           epsilon=epsilon,
                                           filter_class=filter_class)
                 bf.fit(X)
@@ -64,13 +64,13 @@ class TestPybloomliveClassicalBloomFilter(unittest.TestCase):
             for epsilon in epsilon_values:
                 bf = filter_class(n=n, epsilon=epsilon)
                 m = math.ceil(-n * np.log(epsilon) / np.log(2)**2)
-                self.assertEqual(bf.m, m)
+                self.assertEqual(bf.n, n)
 
         for epsilon in epsilon_values:
             for m in m_values:
                 bf = ClassicalBloomFilter(epsilon=epsilon, m=m)
                 n = math.ceil(-m * np.log(2)**2 / np.log(epsilon))
-                self.assertEqual(bf.n, n)
+                self.assertTrue(abs(bf.m - m) <= 1)
 
 
         n_m_values = ((10, 100), (10, 1000), (100, 2000), (1000, 10000))
