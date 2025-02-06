@@ -2,9 +2,9 @@ import numpy as np
 import math
 import unittest
 from learnedbf.classifiers import ScoredRandomForestClassifier, get_tree_size
-from learnedbf import LearnedBloomFilter, SandwichedLearnedBloomFilter
+from learnedbf import LBF, SLBF
 
-learned_filter_classes = [LearnedBloomFilter]
+learned_filter_classes = [LBF]
 
 class TestScoredRF(unittest.TestCase):
 
@@ -55,7 +55,7 @@ class TestScoredRF(unittest.TestCase):
 
             scl = ScoredRandomForestClassifier(max_depth=2)
             scl.fit(objects, labels)
-            slbf = SandwichedLearnedBloomFilter(epsilon=0.1)
+            slbf = SLBF(epsilon=0.1)
             slbf.fit(objects, labels)
 
             self.assertIsNotNone(slbf.initial_filter_)

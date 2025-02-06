@@ -57,7 +57,7 @@ class TestLBF2(unittest.TestCase):
     def test_FN(self):
 
         for lbf in self.filters:
-            self.assertTrue(sum(lbf.predict(self.X_test[~self.y_test]) == 0))
+            self.assertTrue(sum(lbf.predict(self.X_test[self.y_test]) == 0) == 0)
 
 if __name__ == '__main__':
     unittest.main()

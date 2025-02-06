@@ -888,7 +888,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                 'classifier': self.lbf_.classifier.get_size()}
     
 
-class AdaBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
+class AdaLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
     """Implementation of the Adaptive Learned Bloom Filter"""
 
     def __init__(self,
@@ -909,7 +909,7 @@ class AdaBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                  num_group_min = 8,
                  num_group_max = 12,
                  verbose=False):
-        """Create an instance of :class:`AdaBF`.
+        """Create an instance of :class:`AdaLBF`.
 
         :param n: number of keys, defaults to None.
         :type n: `int`
@@ -1017,7 +1017,7 @@ class AdaBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
             args.append(f'verbose={self.verbose}') 
         
         args = ', '.join(args)
-        return f'AdaBF({args})'
+        return f'AdaLBF({args})'
     
     def fit(self, X, y):
         """Fits the Adaptive Learned Bloom Filter, training its classifier,
@@ -1028,7 +1028,7 @@ class AdaBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
         :param y: labels of the examples.
         :type y: array of `bool`
         :return: the fit Bloom Filter instance.
-        :rtype: :class:`AdaBF`
+        :rtype: :class:`AdaLBF`
         :raises: `ValueError` if X is empty, or if no threshold value is
             compliant with the false positive rate requirements.
 
@@ -1152,9 +1152,9 @@ class AdaBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
                 if FP_opt > FP_items:
                     FP_opt = FP_items
-                    self.backup_filter = bloom_filter
+                    self.backup_filter_ = bloom_filter
                     self.thresholds = thresholds
-                    self.k_max = k_max
+                    self.num_groups = k_max
 
         epsilon = FP_opt / len(negative_sample)
         if self.epsilon is not None and epsilon > self.epsilon:
@@ -1196,8 +1196,8 @@ class AdaBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
         for key, score in zip(negative_sample, negative_scores):
             ix = min(np.where(score < self.thresholds)[0])
             # thres = thresholds[ix]
-            k = self.k_max - ix
-            ada_predictions.append(self.backup_filter.check(key, k))
+            k = self.num_groups - ix
+            ada_predictions.append(self.backup_filter_.check(key, k))
 
         predictions[~predictions] = np.array(ada_predictions)
         return predictions
@@ -1341,7 +1341,7 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
         :param y: labels of the examples.
         :type y: array of `bool`
         :return: the fit Bloom Filter instance.
-        :rtype: :class:`AdaBF`
+        :rtype: :class:`AdaLBF`
         :raises: `ValueError` if X is empty, or if no threshold value is
             compliant with the false positive rate requirements.
 
@@ -1661,7 +1661,7 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                 else:
                     backup_filters.append(None)
 
-        self.num_group_ = num_group_opt
+        self.num_groups = num_group_opt
         self.thresholds_ = thresholds_opt
         self.backup_filters_ = backup_filters
         self.is_fitted_ = True
@@ -1692,9 +1692,9 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
         scores = np.array(self.classifier.predict_score(X))
 
-        counts = [0] * self.num_group_
+        counts = [0] * self.num_groups
 
-        for j in range(self.num_group_):
+        for j in range(self.num_groups):
             counts[j] = sum((scores >= self.thresholds_[j]) & (scores < self.thresholds_[j + 1]))
 
         # predictions = scores > self.__thresholds[-1]
