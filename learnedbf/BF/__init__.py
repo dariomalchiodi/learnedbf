@@ -203,7 +203,6 @@ class ClassicalBloomFilter():
             number (k)ems exped to be stored in filter
         '''
 
-        print(m, n)
         k = (m/n) * math.log(2)
         return int(k)
     
