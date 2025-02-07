@@ -656,8 +656,8 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                                     self.num_candidate_thresholds,
                                     endpoint=False))
 
-        b1_optimal = 0
-        b2_optimal = b_optimal = np.inf
+        initial_filter_size_opt = 0
+        backup_filter_size_opt = m_optimal = np.inf
 
         # when optimizing the number of hash functions in a classical BF,
         # the probability of a false positive is alpha raised to m/n,
@@ -755,15 +755,18 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                     continue
 
                 if Fp == 0:
-                    b1 = 0
-                    epsilon_lbf = self.epsilon
-                    # No need for initial filter, just build LBF with its own
-                    # backup filter
-                    b2 = -(Fn * len(key_predictions)) * \
+
+                    if Fp > (1-Fn):
+                        continue
+
+                    initial_filter_size = 0
+                    backup_filter_size = -(Fn * len(key_predictions)) * \
                                 np.log(epsilon_lbf) / np.log(2)**2
+                    
+                    epsilon_lbf = self.epsilon
 
                 elif Fn == 0:
-                    b2 = 0
+                    backup_filter_size = 0
                     epsilon_lbf = Fp
                     # No need for backup filter in LBF, but we need inital BF
                     epsilon_initial_filter = self.epsilon/Fp
@@ -771,42 +774,47 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                         # Weird but possible case: the classifier alone has no
                         # false negatives and its false positive rate is better
                         # than the required rate for the SLBF.
-                        b1 = 0
+                        initial_filter_size = 0
                     else:
-                        b1 = -len(key_predictions) * \
+                        initial_filter_size = -self.n * \
                                 np.log(epsilon_initial_filter) / np.log(2)**2
 
                 else:
+                    if Fp < self.epsilon * (1-Fn) or Fp > (1-Fn):
+                        continue
+
                     b2 = Fn * math.log( \
                                 Fp / ((1 - Fp) * (1/Fn - 1))) / math.log(alpha)
                     epsilon_lbf = Fp + (1-Fp)* alpha ** (b2/Fn) 
+
                     b1 = math.log(self.epsilon / (epsilon_lbf)) \
                         / math.log(alpha)
-                b = b1 + b2
-                if b < b_optimal: 
-                    b_optimal = b
-                    b1_optimal = b1
-                    b2_optimal = b2
+                    
+                    initial_filter_size = b1 * self.n
+                    backup_filter_size = b2 * self.n
+
+                m = initial_filter_size + backup_filter_size
+                if m < m_optimal: 
+                    m_optimal = m
+                    backup_filter_size_opt = backup_filter_size
+                    initial_filter_size_opt = initial_filter_size
                     epsilon_lbf_optimal = epsilon_lbf
                     threshold = t
                     if self.verbose:
                         print(f'Fp = {Fp}')
                         print(f'Fn = {Fn}')
                         print(f't={t}')
-                        print(f'b1_optimal={b1_optimal}')
-                        print(f'b2_optimal={b2_optimal}')
+                        print(f'initial filter opt size={initial_filter_size_opt}')
+                        print(f'backup filter opt size={backup_filter_size_opt}')
                         print(f'=============================')
 
-            initial_filter_size = b1_optimal * self.n
-            backup_filter_size = b2_optimal * self.n
-
-            if b_optimal == np.inf:
+            if m_optimal == np.inf:
                 raise ValueError('No threshold value is feasible.')
         all_keys = X[y]
         if initial_filter_size > 0:
             self.initial_filter_ = BloomFilter(filter_class=self.classical_BF_class,
                                                 n=self.n,
-                                                m=initial_filter_size)
+                                                m=initial_filter_size_opt)
             self.initial_filter_.fit(all_keys)
             true_mask = self.initial_filter_.predict(X)
         else:
@@ -821,7 +829,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
         self.lbf_ = LBF(epsilon=epsilon_lbf_optimal,
                                        classifier=self.classifier,
                                        threshold=threshold,
-                                       backup_filter_size=backup_filter_size)
+                                       backup_filter_size=backup_filter_size_opt)
         self.lbf_.fit(X[true_mask], y[true_mask])
 
         self.is_fitted_ = True
