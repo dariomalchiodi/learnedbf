@@ -744,7 +744,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
             backup_filter_size = optimal_b2
             initial_filter_size = optimal_b1
         elif self.epsilon is not None:
-            #fixed epsilon: optimize bit array size
+            # fixed epsilon: optimize bit array size
             for t in candidate_threshold:
                 key_predictions = (key_scores > t)
                 Fn = (~key_predictions).sum() / len(key_predictions)
@@ -759,11 +759,17 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                     if Fp > (1-Fn):
                         continue
 
+                    # No need for initial filter, just build LBF with its own
+                    # backup filter
                     initial_filter_size = 0
-                    backup_filter_size = -(Fn * len(key_predictions)) * \
-                                np.log(epsilon_lbf) / np.log(2)**2
+
+                    epsilon_b = (self.epsilon - Fp) / (1 - Fp)  
+                    print(epsilon_b)
+
+                    backup_filter_size = -(Fn * self.n) * \
+                                np.log(epsilon_b) / np.log(2)**2
                     
-                    epsilon_lbf = self.epsilon
+                    epsilon_lbf = Fp + (1-Fp)*epsilon_b
 
                 elif Fn == 0:
                     backup_filter_size = 0
@@ -791,8 +797,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                         / math.log(alpha)
                     
                     initial_filter_size = b1 * self.n
-                    backup_filter_size = b2 * self.n
-
+                    backup_filter_size = b2 * self.n                   
                 m = initial_filter_size + backup_filter_size
                 if m < m_optimal: 
                     m_optimal = m
@@ -810,11 +815,15 @@ class SLBF(BaseEstimator, BaseBloomFilter,
 
             if m_optimal == np.inf:
                 raise ValueError('No threshold value is feasible.')
+            
+            backup_filter_size = backup_filter_size_opt
+            initial_filter_size = initial_filter_size_opt
+
         all_keys = X[y]
         if initial_filter_size > 0:
             self.initial_filter_ = BloomFilter(filter_class=self.classical_BF_class,
                                                 n=self.n,
-                                                m=initial_filter_size_opt)
+                                                m=initial_filter_size)
             self.initial_filter_.fit(all_keys)
             true_mask = self.initial_filter_.predict(X)
         else:
@@ -829,7 +838,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
         self.lbf_ = LBF(epsilon=epsilon_lbf_optimal,
                                        classifier=self.classifier,
                                        threshold=threshold,
-                                       backup_filter_size=backup_filter_size_opt)
+                                       backup_filter_size=backup_filter_size)
         self.lbf_.fit(X[true_mask], y[true_mask])
 
         self.is_fitted_ = True
@@ -1161,8 +1170,8 @@ class AdaLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                 if FP_opt > FP_items:
                     FP_opt = FP_items
                     self.backup_filter_ = bloom_filter
-                    self.thresholds = thresholds
-                    self.num_groups = k_max
+                    self.thresholds_ = thresholds
+                    self.num_group_ = k_max
 
         epsilon = FP_opt / len(negative_sample)
         if self.epsilon is not None and epsilon > self.epsilon:
@@ -1196,15 +1205,15 @@ class AdaLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
         scores = np.array(self.classifier.predict_score(X))
 
-        predictions = scores > self.thresholds[-2]
-        negative_sample = X[scores <= self.thresholds[-2]]
-        negative_scores = scores[scores <= self.thresholds[-2]]
+        predictions = scores > self.thresholds_[-2]
+        negative_sample = X[scores <= self.thresholds_[-2]]
+        negative_scores = scores[scores <= self.thresholds_[-2]]
 
         ada_predictions = []
         for key, score in zip(negative_sample, negative_scores):
-            ix = min(np.where(score < self.thresholds)[0])
+            ix = min(np.where(score < self.thresholds_)[0])
             # thres = thresholds[ix]
-            k = self.num_groups - ix
+            k = self.num_group_ - ix
             ada_predictions.append(self.backup_filter_.check(key, k))
 
         predictions[~predictions] = np.array(ada_predictions)
@@ -1383,10 +1392,8 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
         try:
             check_is_fitted(self.classifier)
-            # a trained classifier was passed to the constructor
             X_neg_threshold_test = X[~y]
         except NotFittedError:
-            # the classifier has to be trained
             X_neg = X[~y]
 
             X_neg_trainval, X_neg_threshold_test = \
@@ -1438,6 +1445,8 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                 delete_ix += [i]
         score_partition = np.delete(score_partition, [i for i in delete_ix])
 
+        h = [np.sum((score_low<=nonkey_scores) & (nonkey_scores<score_up)) for score_low, score_up in zip(score_partition[:-1], score_partition[1:])]
+        h = np.array(h)
         g = [np.sum((score_low<=key_scores) & (key_scores<score_up)) for score_low, score_up in zip(score_partition[:-1], score_partition[1:])]
         g = np.array(g)
 
@@ -1445,13 +1454,13 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
         for i in range(len(g)):
             if g[i] < 1:
                 delete_ix += [i]
-        score_partition = np.delete(score_partition, [i+1 for i in delete_ix])
+        score_partition = np.delete(score_partition, [i for i in delete_ix])
 
         ## Find the counts in each interval
         h = [np.sum((score_low<=nonkey_scores) & (nonkey_scores<score_up)) for score_low, score_up in zip(score_partition[:-1], score_partition[1:])]
-        h = np.array(h) / np.sum(h)
+        h = np.array(h) / sum(h)
         g = [np.sum((score_low<=key_scores) & (key_scores<score_up)) for score_low, score_up in zip(score_partition[:-1], score_partition[1:])]
-        g = np.array(g) / np.sum(g)
+        g = np.array(g) / sum(g)
         
         n = len(score_partition)
         if self.optim_KL is None and self.optim_partition is None:
@@ -1504,37 +1513,16 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
 
                 R = np.zeros(num_group)
-                #R_ = np.zeros(num_group)
 
                 alpha = 0.5 ** np.log(2)
                 c = self.m / self.n + (-self.optim_KL[-1][num_group-1] / np.log2(alpha))
                 
-                # print(f"KL={self.optim_KL[-1]}")
-                # print(f"M={self.m}, n={self.n}, c={c}, KL[-1][num_gorup]={self.optim_KL[-1][num_group-1]}")
-                # print(f"sum_keys: {sum(count_key)}/{len(X_pos)}, sum non_keys: {sum(count_nonkey)}/{len(X_neg_threshold_test)}")
-                # print(count_key[j], count_nonkey[j], c)
                 for j in range(num_group):
-                    # print(f"count key: {count_key[j]}")
-                    # print(f"count nonkey: {count_nonkey[j]}")
-
                     g_j = count_key[j] / self.n
                     h_j = count_nonkey[j] / len(X_neg_threshold_test)
 
-
-                    # print(f"g_i: {g_j}")
-                    # print(f"h_i: {h_j}")
-
-                    # print(f"np.log2(g_i / h_i)={np.log2(g_j / h_j)}")
-
                     R_j = count_key[j] * (np.log2(g_j/h_j)/np.log(alpha) + c)
-                    #R_[j] = count_key[j] * (np.log2(g_j/h_j)/np.log(alpha) + c)
                     R[j] = max(1, R_j)
-
-
-                    #R[j] = max(1, count_key[j] * np.log2(count_key[j] / count_nonkey[j]) / np.log2(0.618) + c)
-                
-                # print("sizes: ", R)
-                # print(f"sum(sizes) = {sum(R)}")
 
                 #We need to fix the sizes to use all the available space
                 pos_sizes_mask = R > 0
@@ -1547,9 +1535,6 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
                 for j in range(len(R)):
                     R[j] = max(1, R[j])
-
-                # print(f"fixed_sizes: {R}")
-                # print(f"sum(fixed_sizes) = {sum(R)}")
 
                 backup_filters = []
                 for j in range(num_group):
@@ -1571,13 +1556,6 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                                         m=R[j]))
                         for item in query_group[j]:
                             backup_filters[j].add(item)
-
-                # print(backup_filters)
-
-                ### Test querys
-                #ML_positive = X_neg_threshold_test[nonkey_scores >= thresholds[-2]]
-                #items_negative = X_neg_threshold_test[nonkey_scores < thresholds[-2]]
-                #score_negative = nonkey_scores[nonkey_scores < thresholds[-2]]
 
                 FP_items = 0
                 for score, item in zip(nonkey_scores, X_neg_threshold_test):
@@ -1619,16 +1597,20 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
                 query_group = []
                 for j in range(num_group):
-                    count_nonkey[j] = sum((nonkey_scores >= thresholds[j]) & (nonkey_scores < thresholds[j + 1]))
-                    count_key[j] = sum((key_scores >= thresholds[j]) & (key_scores < thresholds[j + 1]))
-                    query_group.append(X_pos[(key_scores >= thresholds[j]) & (key_scores < thresholds[j + 1])])
+                    count_nonkey[j] = sum((nonkey_scores >= thresholds[j]) & \
+                                          (nonkey_scores < thresholds[j + 1]))
+                    count_key[j] = sum((key_scores >= thresholds[j]) & \
+                                       (key_scores < thresholds[j + 1]))
+                    query_group.append(X_pos[(key_scores >= thresholds[j]) & \
+                                             (key_scores < thresholds[j + 1])])
                     g_sum = 0
                     h_sum = 0
 
                 f = np.zeros(num_group)
 
                 for i in range(num_group):
-                    f[i] = self.epsilon * count_key[i] / count_nonkey[i]
+                    f[i] = self.epsilon * (count_key[i]/sum(count_key)) / \
+                                 (count_nonkey[i]/sum(count_nonkey))
 
                 while sum(f > 1) > 0:
                     for i in range(num_group):
@@ -1639,12 +1621,15 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
                     for i in range(num_group):
                         if f[i] == 1:
-                            g_sum += count_key[i]
-                            h_sum += count_nonkey[i]
+                            g_sum += count_key[i] / np.sum(count_key)
+                            h_sum += count_nonkey[i] / np.sum(count_nonkey)
                     
                     for i in range(num_group):
                         if f[i] < 1:
-                            f[i] = g[i]*(self.epsilon - h_sum) / (1-g_sum)
+
+                            g_i = count_key[i]/sum(count_key)
+                            h_i = count_nonkey[i]/sum(count_nonkey)
+                            f[i] = g_i*(self.epsilon-h_sum) / (h_i*(1-g_sum))
 
                 m = 0
                 for i in range(num_group):
@@ -1655,7 +1640,6 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                     f_optimal = f
                     num_group_opt = num_group
                     thresholds_opt = thresholds
-
 
             backup_filters = []
             for i in range(num_group_opt):
