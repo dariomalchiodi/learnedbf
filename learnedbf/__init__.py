@@ -11,7 +11,7 @@ from sklearn.model_selection import StratifiedKFold, GridSearchCV, \
 from sklearn.utils.validation import NotFittedError, check_X_y, check_array, \
                                      check_is_fitted
 
-from learnedbf.BF import BaseBloomFilter, BloomFilter, ClassicalBloomFilter, VarhashBloomFilter
+from learnedbf.BF import BloomFilter, ClassicalBloomFilter, VarhashBloomFilter, ClassicalBloomFilterImpl
 from learnedbf.classifiers import ScoredDecisionTreeClassifier
 
 # TODO: check the behavior when using non-integer keys
@@ -60,7 +60,7 @@ def check_y(y):
                         (False, True)")
 
 
-class LBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
+class LBF(BaseEstimator, BloomFilter, ClassifierMixin):
     """Implementation of the Learned Bloom Filter"""
 
     # MASTER TODO: Each classifier class should
@@ -84,7 +84,7 @@ class LBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                  scoring=auprc_score,
                  threshold_evaluate=threshold_evaluate,
                  threshold=None,
-                 classical_BF_class=ClassicalBloomFilter,
+                 classical_BF_class=ClassicalBloomFilterImpl,
                  backup_filter_size=None,
                  random_state=4678913,
                  verbose=False):
@@ -130,7 +130,7 @@ class LBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
         :param threshold: the threshold of the bloom filter, defaults to `None`.
         :type threshold: `float`
         :param classical_BF_class: class of the backup filter, defaults
-            to :class:`ClassicalBloomFilter`.
+            to :class:`ClassicalBloomFilterImpl`.
         :param backup_filter_size: the size of the backup filter, defaults to `None`.
         :type backup_filter_size: `int`
         :param random_state: random seed value, defaults to `None`,
@@ -369,7 +369,7 @@ class LBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                 backup_filter_fpr = None
 
             self.backup_filter_ = \
-                BloomFilter(filter_class=self.classical_BF_class,
+                ClassicalBloomFilter(filter_class=self.classical_BF_class,
                                 n=num_fn,  
                                 epsilon=backup_filter_fpr,      
                                 m=self.backup_filter_size)
@@ -441,8 +441,7 @@ class LBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
         return {'backup_filter': backup_filter_size,
                 'classifier': self.classifier.get_size()}
 
-class SLBF(BaseEstimator, BaseBloomFilter,
-                                   ClassifierMixin):
+class SLBF(BaseEstimator, BloomFilter, ClassifierMixin):
     """Implementation of the Sandwiched Learned Bloom Filter"""
 
     def __init__(self,
@@ -458,7 +457,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                                                         shuffle=True),
                  scoring=auprc_score,
                  threshold_evaluate=threshold_evaluate,
-                 classical_BF_class=ClassicalBloomFilter,
+                 classical_BF_class=ClassicalBloomFilterImpl,
                  random_state=4678913,
                  verbose=False):
         """Create an instance of :class:`SLBF`.
@@ -502,7 +501,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
           backup filter).
         :type threshold_evaluate: function
         :param classical_BF_class: class of the backup filter, defaults
-            to :class:`ClassicalBloomFilter`.
+            to :class:`ClassicalBloomFilterImpl`.
         :param random_state: random seed value, defaults to `None`,
             meaning the current seed value should be kept.
         :type random_state: `int` or `None`
@@ -821,7 +820,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
 
         all_keys = X[y]
         if initial_filter_size > 0:
-            self.initial_filter_ = BloomFilter(filter_class=self.classical_BF_class,
+            self.initial_filter_ = ClassicalBloomFilter(filter_class=self.classical_BF_class,
                                                 n=self.n,
                                                 m=initial_filter_size)
             self.initial_filter_.fit(all_keys)
@@ -905,7 +904,7 @@ class SLBF(BaseEstimator, BaseBloomFilter,
                 'classifier': self.lbf_.classifier.get_size()}
     
 
-class AdaLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
+class AdaLBF(BaseEstimator, BloomFilter, ClassifierMixin):
     """Implementation of the Adaptive Learned Bloom Filter"""
 
     def __init__(self,
@@ -1237,7 +1236,7 @@ class AdaLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                 'classifier': self.classifier.get_size()}
     
 
-class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
+class PLBF(BaseEstimator, BloomFilter, ClassifierMixin):
     """Implementation of the Partitioned Learned Bloom Filter"""
 
     def __init__(self,
@@ -1251,7 +1250,7 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                  model_selection_method=StratifiedKFold(n_splits=5,
                                                         shuffle=True),
                  scoring=auprc_score,
-                 classical_BF_class=ClassicalBloomFilter,
+                 classical_BF_class=ClassicalBloomFilterImpl,
                  random_state=4678913,
                  num_group_min = 4,
                  num_group_max = 6,
@@ -1288,7 +1287,7 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
             classifiers, defaults to `auprc`.
         :type scoring: `str` or function
         :param classical_BF_class: class of the backup filter, defaults
-            to :class:`ClassicalBloomFilter`.
+            to :class:`ClassicalBloomFilterImpl`.
         :param random_state: random seed value, defaults to `None`,
             meaning the current seed value should be kept.
         :type random_state: `int` or `None`
@@ -1541,17 +1540,8 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                     if count_key[j]==0:
                         backup_filters.append(None)
                     else:
-                        backup_filters.append(ClassicalBloomFilter(n=count_key[j], m=R[j]))
-                        for item in query_group[j]:
-                            backup_filters[j].add(item)
-
-                backup_filters = []
-                for j in range(num_group):
-                    if count_key[j]==0:
-                        backup_filters.append(None)
-                    else:
                         backup_filters.append( \
-                            BloomFilter(filter_class=self.classical_BF_class, 
+                            ClassicalBloomFilter(filter_class=self.classical_BF_class, 
                                         n=count_key[j], 
                                         m=R[j]))
                         for item in query_group[j]:
@@ -1567,8 +1557,6 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
 
                 if FP_opt > FP_items:
                     num_group_opt = num_group
-                    count_key_opt = count_key
-                    R_opt = R
                     FP_opt = FP_items
                     backup_filters_opt = backup_filters
                     thresholds_opt = thresholds
@@ -1641,21 +1629,33 @@ class PLBF(BaseEstimator, BaseBloomFilter, ClassifierMixin):
                     num_group_opt = num_group
                     thresholds_opt = thresholds
 
-            backup_filters = []
+
+            count_nonkey = np.zeros(num_group_opt)
+            count_key = np.zeros(num_group_opt)
+            query_group = []
+            for j in range(num_group_opt):
+                count_nonkey[j] = sum((nonkey_scores >= thresholds[j]) & \
+                                        (nonkey_scores < thresholds[j + 1]))
+                count_key[j] = sum((key_scores >= thresholds[j]) & \
+                                    (key_scores < thresholds[j + 1]))
+                query_group.append(X_pos[(key_scores >= thresholds[j]) & \
+                                            (key_scores < thresholds[j + 1])])
+
+            backup_filters_opt = []
             for i in range(num_group_opt):
                 if f_optimal[i] < 1:
-                    bf = BloomFilter(filter_class=self.classical_BF_class, 
-                                     n=count_key[i], 
-                                     epsilon=f[i])
+                    bf = ClassicalBloomFilter(filter_class=self.classical_BF_class, 
+                                        n=count_key[i], 
+                                        epsilon=f[i])
                     for key in query_group[i]:
                         bf.add(key)
-                    backup_filters.append(bf)
+                    backup_filters_opt.append(bf)
                 else:
-                    backup_filters.append(None)
+                    backup_filters_opt.append(None)
 
         self.num_groups = num_group_opt
         self.thresholds_ = thresholds_opt
-        self.backup_filters_ = backup_filters
+        self.backup_filters_ = backup_filters_opt
         self.is_fitted_ = True
         self.n_features_in_ = X.shape[1]
 
