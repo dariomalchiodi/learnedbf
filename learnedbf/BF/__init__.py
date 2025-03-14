@@ -67,13 +67,13 @@ def check_params_(n, epsilon, m):
     if m is None:
         return n, epsilon, -n * np.log(epsilon) / np.log(2)**2
 
-class BaseBloomFilter:
+class BloomFilter:
     """Base BloomFilter class."""
 
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, n=None, epsilon=None):
-        """Create an instance of :class:`BaseBloomFilter`.
+        """Create an instance of :class:`BloomFilter`.
 
         :param n: number of keys, defaults to 10.
         :type n: `int`
@@ -137,7 +137,7 @@ class BaseBloomFilter:
 
 
 
-class ClassicalBloomFilter():
+class ClassicalBloomFilterImpl():
 
     def __init__(self, n=None, epsilon=None, m=None):
         """
@@ -214,17 +214,6 @@ class hashfunc():
 
     def __call__(self, x):
         return mmh3.hash(x, self.seed) % self.m
-
-# def hashfunc(m):
-#     """
-#     Generates an hash function based on mmh3
-
-#     :param m: the max size of the value the generated function can produce
-#     """
-#     seed = randint(1, 99999999)
-#     def hash_m(x):
-        
-#     return hash_m
 
 class VarhashBloomFilter(BaseEstimator, ClassifierMixin):
 
@@ -415,12 +404,12 @@ class PyBloomLiveAdapter:
         return int(self.m) + 1
 
 
-class BloomFilter(BaseBloomFilter, BaseEstimator, ClassifierMixin):
+class ClassicalBloomFilter(BloomFilter, BaseEstimator, ClassifierMixin):
     """Implementation of a classical Bloom Filter."""
 
     def __init__(self, n=None, epsilon=None, m=None,
-                 filter_class=ClassicalBloomFilter):
-        """Create an instance of :class:`BloomFilter`.
+                 filter_class=ClassicalBloomFilterImpl):
+        """Create an instance of :class:`ClassicalBloomFilter`.
 
         :param n: number of keys, defaults to `None`.
         :type n: `int`
@@ -430,7 +419,7 @@ class BloomFilter(BaseBloomFilter, BaseEstimator, ClassifierMixin):
         :type m: `int`
 
         :param filter_class: used Bloom Filter class, defaults to
-            :class:'ClassicalBloomFilter'.
+            :class:'ClassicalBloomFilterImpl'.
         :type filter_class: `class`
         """
 

@@ -11,7 +11,7 @@ class TestPybloomliveClassicalBloomFilter(unittest.TestCase):
         for num_keys in np.logspace(1, 5, 5).astype(int):
             for epsilon in (0.01, 0.05, 0.1, 0.2):
                 X = np.random.randint(0, 1_000_000, size=(num_keys, 1))
-                bf = BloomFilter(n=num_keys,
+                bf = ClassicalBloomFilter(n=num_keys,
                                           epsilon=epsilon,
                                           filter_class=filter_class)
                 bf.fit(X)
@@ -22,7 +22,7 @@ class TestPybloomliveClassicalBloomFilter(unittest.TestCase):
             self._check_train(filter_class)
 
     def _check_empty(self, filter_class):
-        bf = BloomFilter(n=20,
+        bf = ClassicalBloomFilter(n=20,
                                   epsilon=0.01,
                                   filter_class=filter_class)
 
@@ -37,7 +37,7 @@ class TestPybloomliveClassicalBloomFilter(unittest.TestCase):
         for num_keys in np.logspace(1, 5, 5).astype(int):
             for epsilon in (0.01, 0.05, 0.1, 0.2):
                 X = np.random.randint(0, 1_000_000, size=(num_keys, 1))
-                bf = BloomFilter(n=num_keys,
+                bf = ClassicalBloomFilter(n=num_keys,
                                           epsilon=epsilon,
                                           filter_class=filter_class)
                 bf.fit(X)
